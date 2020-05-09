@@ -7,6 +7,28 @@ object SetService {
   case class Lit(lit: String) extends Expr
   object Empty extends Expr
 
+  // Grab the item in the set if it's the only item
+  // Avoids checking the set size, which is theoretically costly to compute
+  // This is probably slower in practice!
+  def singleOption[A](set: Set[A]): Option[A] = {
+    import cats._
+    import cats.data._
+    import cats.instances.set._
+    import cats.kernel.CommutativeMonoid
+
+    val monoid: CommutativeMonoid[Option[A]] = new CommutativeMonoid[Option[A]] {
+      def combine(x: Option[A], y: Option[A]): Option[A] = (x, y) match {
+        case (some@Some(_), None) => some
+        case _ => None
+      }
+      def empty: Option[A] = None
+    }
+
+    def toOption(a: A): Option[A] = Some(a)
+
+    UnorderedFoldable[Set].unorderedFoldMap(set)(toOption)(monoid)
+  }
+
   object Expr {
     def reduce(expr: Expr): Expr = expr match {
       case And(and) => And.reduce(and)
@@ -23,21 +45,23 @@ object SetService {
     import cats.kernel.CommutativeMonoid
 
     implicit val monoid = new CommutativeMonoid[Expr] {
-      def combine(x: Expr, y: Expr): Expr = {
-        (Expr.reduce(x), Expr.reduce(y)) match {
-          case (Or(a), Or(b)) => Or(a ++ b)
-          case (Or(a), Lit(b)) => Or(a + Lit(b))
-          case (Lit(a), Or(b)) => Or(b + Lit(a))
-          case (Lit(a), Lit(b)) => Or(Set(Lit(b), Lit(a)))
-          case (a: Expr, b: Expr) => Or(Set(a, b)) // TODO
-        }
+      def combine(x: Expr, y: Expr): Expr = (x, y) match {
+        case (Or(a), Or(b)) => Or(a ++ b)
+        case (Or(a), Lit(b)) => Or(a + Lit(b))
+        case (Lit(a), Or(b)) => Or(b + Lit(a))
+        case (a: Expr, b: Expr) => Or(Set(a, b))
       }
 
       def empty: Expr = Or(Set.empty) // All
     }
 
-    def reduce(or: Set[Expr]): Expr =
-      UnorderedFoldable[Set].unorderedFold(or)
+    def reduce(or: Set[Expr]): Expr = {
+      val expr = UnorderedFoldable[Set].unorderedFoldMap(or)(Expr.reduce)
+      expr match {
+        case Or(set) if set.size == 1 => set.head // TODO: don't read full size, only 2 elements
+        case _ => expr
+      }
+    }
   }
 
   object And {
@@ -48,21 +72,23 @@ object SetService {
     import cats.kernel.CommutativeMonoid
 
     implicit val monoid = new CommutativeMonoid[Expr] {
-      def combine(x: Expr, y: Expr): Expr = {
-        (Expr.reduce(x), Expr.reduce(y)) match {
-          case (And(a), And(b)) => And(a ++ b)
-          case (And(a), Lit(b)) => And(a + Lit(b))
-          case (Lit(a), And(b)) => And(b + Lit(a))
-          case (Lit(a), Lit(b)) => And(Set(Lit(b), Lit(a)))
-          case (a: Expr, b: Expr) => And(Set(a, b)) // TODO
-        }
+      def combine(x: Expr, y: Expr): Expr = (x, y) match {
+        case (And(a), And(b)) => And(a ++ b)
+        case (And(a), Lit(b)) => And(a + Lit(b))
+        case (Lit(a), And(b)) => And(b + Lit(a))
+        case (a: Expr, b: Expr) => And(Set(a, b))
       }
 
       def empty: Expr = And(Set.empty) // None
     }
 
-    def reduce(and: Set[Expr]): Expr =
-      UnorderedFoldable[Set].unorderedFold(and)
+    def reduce(and: Set[Expr]): Expr = {
+      val expr = UnorderedFoldable[Set].unorderedFoldMap(and)(Expr.reduce)
+      expr match {
+        case And(set) if set.size == 1 => set.head // TODO: don't read full size, only 2 elements
+        case _ => expr
+      }
+    }
   }
 
   object GenericDerivation {
