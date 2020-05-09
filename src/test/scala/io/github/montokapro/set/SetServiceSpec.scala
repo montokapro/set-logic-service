@@ -7,8 +7,8 @@ import io.github.montokapro.set.SetService._
 class SetServiceSpec extends FunSpec {
   describe("set") {
     it("should deduplicate expr") {
-      val actual = Set(Lit("a"), Lit("a"))
-      val expected = Set(Lit("a"))
+      val actual = Set(Id(1), Id(1))
+      val expected = Set(Id(1))
       assert(actual == expected)
     }
   }
@@ -42,81 +42,178 @@ class SetServiceSpec extends FunSpec {
   describe("And") {
     it("should simplify single") {
       val actual = And(Set(
-        Lit("a"),
+        Id(1),
       ))
-      val expected = Lit("a")
+      val expected = Id(1)
+      assert(Expr.reduce(actual) == expected)
+    }
+
+    it("should simplify multiple") {
+      val actual = And(Set(
+        Id(1),
+        Id(2)
+      ))
+      val expected = Bottom
       assert(Expr.reduce(actual) == expected)
     }
 
     it("should reduce nested") {
       val actual = And(Set(
         And(Set(
-          Lit("a"),
-          Lit("b")
+          Id(1),
+          Id(2)
         )),
         And(Set(
-          Lit("b"),
-          Lit("c")
+          Id(2),
+          Id(3)
         ))
       ))
-      val expected = And(Set.empty)
+      val expected = Bottom
       assert(Expr.reduce(actual) == expected)
     }
 
     it("should reduce empty") {
       val actual = And(Set(
-        And(Set(
-          Lit("a"),
-          Lit("b")
-        )),
-        And(Set.empty)
+        Id(1),
+        Bottom
       ))
-      val expected = And(Set.empty)
+      val expected = Bottom
       assert(Expr.reduce(actual) == expected)
+    }
+
+    describe("Not") {
+      it("should simplify single") {
+        val actual = And(Set(
+          Not(Id(1)),
+        ))
+        val expected = Not(Id(1))
+        assert(Expr.reduce(actual) == expected)
+      }
+
+      it("should not simplify multiple") {
+        val actual = And(Set(
+          Not(Id(1)),
+          Not(Id(2))
+        ))
+        assert(Expr.reduce(actual) == actual)
+      }
+
+      it("should reduce nested") {
+        val actual = And(Set(
+          And(Set(
+            Not(Id(1)),
+            Not(Id(2))
+          )),
+          And(Set(
+            Not(Id(2)),
+            Not(Id(3))
+          ))
+        ))
+        val expected = And(Set(
+          Not(Id(1)),
+          Not(Id(2)),
+          Not(Id(3))
+        ))
+        assert(Expr.reduce(actual) == expected)
+      }
+
+      it("should reduce empty") {
+        val actual = And(Set(
+          Not(Id(1)),
+          Bottom
+        ))
+        val expected = Bottom
+        assert(Expr.reduce(actual) == expected)
+      }
     }
   }
 
   describe("Or") {
     it("should simplify single") {
       val actual = Or(Set(
-        Lit("a")
+        Id(1)
       ))
-      val expected = Lit("a")
+      val expected = Id(1)
       assert(Expr.reduce(actual) == expected)
+    }
+
+    it("should not simplify multiple") {
+      val actual = Or(Set(
+        Id(1),
+        Id(2)
+      ))
+      assert(Expr.reduce(actual) == actual)
     }
 
     it("should reduce nested") {
       val actual = Or(Set(
         Or(Set(
-          Lit("a"),
-          Lit("b")
+          Id(1),
+          Id(2)
         )),
         Or(Set(
-          Lit("b"),
-          Lit("c")
+          Id(2),
+          Id(3)
         ))
       ))
       val expected = Or(Set(
-        Lit("a"),
-        Lit("b"),
-        Lit("c")
+        Id(1),
+        Id(2),
+        Id(3)
       ))
       assert(Expr.reduce(actual) == expected)
     }
 
     it("should reduce empty") {
       val actual = Or(Set(
-        Or(Set(
-          Lit("a"),
-          Lit("b")
-        )),
-        Or(Set.empty)
+        Id(1),
+        Top
       ))
-      val expected = Or(Set(
-        Lit("a"),
-        Lit("b")
-      ))
+      val expected = Top
       assert(Expr.reduce(actual) == expected)
+    }
+
+    describe("Not") {
+      it("should simplify single") {
+        val actual = Or(Set(
+          Not(Id(1)),
+        ))
+        val expected = Not(Id(1))
+        assert(Expr.reduce(actual) == expected)
+      }
+
+      it("should simplify multiple") {
+        val actual = Or(Set(
+          Not(Id(1)),
+          Not(Id(2))
+        ))
+        val expected = Top
+        assert(Expr.reduce(actual) == expected)
+      }
+
+      it("should reduce nested") {
+        val actual = Or(Set(
+          Or(Set(
+            Not(Id(1)),
+            Not(Id(2))
+          )),
+          Or(Set(
+            Not(Id(2)),
+            Not(Id(3))
+          ))
+        ))
+        val expected = Not(Id(2))
+        assert(Expr.reduce(actual) == expected)
+      }
+
+      it("should reduce empty") {
+        val actual = Or(Set(
+          Not(Id(1)),
+          Top
+        ))
+        val expected = Top
+        assert(Expr.reduce(actual) == expected)
+      }
     }
   }
 }
