@@ -46,20 +46,24 @@ object SetService {
 
     implicit val monoid = new CommutativeMonoid[Expr] {
       def combine(x: Expr, y: Expr): Expr = (x, y) match {
-        case (Or(a), Or(b)) => Or(a ++ b)
+        case (Or(a), Or(b)) => Or(a union b)
         case (Or(a), Lit(b)) => Or(a + Lit(b))
         case (Lit(a), Or(b)) => Or(b + Lit(a))
         case (a: Expr, b: Expr) => Or(Set(a, b))
       }
 
-      def empty: Expr = Or(Set.empty) // All
+      def empty: Expr = Or(Set.empty) // Top type, matches everything
     }
 
     def reduce(or: Set[Expr]): Expr = {
-      val expr = UnorderedFoldable[Set].unorderedFoldMap(or)(Expr.reduce)
-      expr match {
-        case Or(set) if set.size == 1 => set.head // TODO: don't read full size, only 2 elements
-        case _ => expr
+      if (or.isEmpty) {
+        Or(or)
+      } else {
+        val expr = UnorderedFoldable[Set].unorderedFoldMap(or)(Expr.reduce)
+        expr match {
+          case Or(set) if set.size == 1 => set.head // TODO: don't read full size, only 2 elements
+          case _ => expr
+        }
       }
     }
   }
@@ -73,20 +77,25 @@ object SetService {
 
     implicit val monoid = new CommutativeMonoid[Expr] {
       def combine(x: Expr, y: Expr): Expr = (x, y) match {
-        case (And(a), And(b)) => And(a ++ b)
-        case (And(a), Lit(b)) => And(a + Lit(b))
-        case (Lit(a), And(b)) => And(b + Lit(a))
-        case (a: Expr, b: Expr) => And(Set(a, b))
+        case (And(a), And(b)) => And(a intersect b)
+        case (And(a), Lit(b)) => And(a intersect Set(Lit(b)))
+        case (Lit(a), And(b)) => And(b intersect Set(Lit(a)))
+        case (a: Expr, b: Expr) => And(Set(a) intersect Set(b))
       }
 
-      def empty: Expr = And(Set.empty) // None
+      def empty: Expr = And(Set.empty) // Bottom type, matches nothing
     }
 
     def reduce(and: Set[Expr]): Expr = {
-      val expr = UnorderedFoldable[Set].unorderedFoldMap(and)(Expr.reduce)
-      expr match {
-        case And(set) if set.size == 1 => set.head // TODO: don't read full size, only 2 elements
-        case _ => expr
+      if (and.isEmpty) {
+        And(and)
+      } else {
+        val expr = and.map(Expr.reduce).reduce(monoid.combine)
+        // val expr = UnorderedFoldable[Set].unorderedFoldMap(and)(Expr.reduce)
+        expr match {
+          case And(set) if set.size == 1 => set.head // TODO: don't read full size, only 2 elements
+          case _ => expr
+        }
       }
     }
   }
