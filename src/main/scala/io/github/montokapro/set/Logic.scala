@@ -10,7 +10,8 @@ object Logic {
 
   sealed trait Expr
   case class Id(id: Int) extends Expr
-  case class Group(and: Option[Set[Expr]], or: Option[Set[Expr]]) extends Expr
+  case class Not(not: Expr) extends Expr
+  case class Group(intersect: Option[Set[Expr]], union: Option[Set[Expr]]) extends Expr
 
   object SetInstances {
     import cats.kernel.BoundedSemilattice
@@ -32,21 +33,39 @@ object Logic {
     import cats.syntax.apply._
     import cats.instances.invariant._
 
-    implicit val monoid: Monoid[Group] = (
+    val monoidWithoutReduction: Monoid[Group] = (
       {
-        implicit val and = new SetInstances.SetIntersectSemilattice[Expr]
+        implicit val intersect = new SetInstances.SetIntersectSemilattice[Expr]
         Monoid[Option[Set[Expr]]]
       },
       {
-        implicit val or = new SetInstances.SetUnionSemilattice[Expr]
+        implicit val union = new SetInstances.SetUnionSemilattice[Expr]
         Monoid[Option[Set[Expr]]]
       }
     ).imapN(Group.apply _)(Group.unapply(_).get)
 
-    // A group cannot represent both all values and no values simultaneous
+    // TODO: Reduce the number of redundant intersections
+    // during the reduction law of the excluded middle
+    //
+    // Consider making a custom monoid without using
+    // monoidWithoutReduction
+    implicit val monoid: Monoid[Group] = new Monoid[Group] {
+      def combine(a: Group, b: Group): Group = Group.reduce({
+        monoidWithoutReduction.combine(a, b)
+      })
+
+      def empty: Group = monoidWithoutReduction.empty
+    }
+
+    // A group cannot represent both all values and no values simultaneously
     val invalid = Group(
       Some(Set.empty), // Matches no values
       Some(Set.empty) // Matches all values
     )
+
+    def reduce(group: Group): Group = group match {
+      case Group(Some(intersect), Some(union)) if ((intersect intersect union).nonEmpty) => invalid
+      case _ => group
+    }
   }
 }

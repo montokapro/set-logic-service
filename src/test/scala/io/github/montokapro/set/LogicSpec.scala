@@ -16,7 +16,6 @@ class LogicSpec extends FunSpec {
   describe("Group") {
     import cats.syntax._
     import cats.syntax.semigroup._
-    // import cats.syntax.monoid._
     import Group._
 
     it("should have an empty") {
@@ -32,7 +31,7 @@ class LogicSpec extends FunSpec {
     it("should compose single") {
       val single = Group(
         Some(Set(Id(1))),
-        Some(Set(Id(1)))
+        Some(Set(Id(2)))
       )
       val actual = single |+| single
       assert((single |+| single) == single)
@@ -45,8 +44,8 @@ class LogicSpec extends FunSpec {
           Id(2)
         )),
         Some(Set(
-          Id(1),
-          Id(2)
+          Id(4),
+          Id(5)
         ))
       )
       val right = Group(
@@ -55,8 +54,8 @@ class LogicSpec extends FunSpec {
           Id(3)
         )),
         Some(Set(
-          Id(2),
-          Id(3)
+          Id(5),
+          Id(6)
         ))
       )
       val expected = Group(
@@ -64,12 +63,24 @@ class LogicSpec extends FunSpec {
           Id(2)
         )),
         Some(Set(
-          Id(1),
-          Id(2),
-          Id(3)
+          Id(4),
+          Id(5),
+          Id(6)
         ))
       )
       assert((left |+| right) == expected)
+    }
+
+    it("should respect law of the middle") {
+      val actual = Group(
+        Some(Set(
+          Id(1)
+        )),
+        Some(Set(
+          Id(1)
+        ))
+      )
+      assert(Group.reduce(actual) == Group.invalid)
     }
   }
 }
