@@ -18,6 +18,16 @@ object SetInstances {
 
 case class Cut[T](intersect: Option[Set[T]], union: Option[Set[T]])
 
+/*
+ * This is named a cut due to its similarity to a logical cuts
+ *
+ * This structure permits cases that can diverge and produce unsound logical
+ * statements akin to true equals false
+ *
+ * In this case the contradiction is everything equals nothing
+ *
+ * Contradictions result in divergent (undefined) behavior
+ */
 object Cut {
   import cats.Monoid
   import cats.MonoidK
@@ -43,8 +53,10 @@ object Cut {
     def combineK[A](x: Cut[A], y: Cut[A]): Cut[A] = monoid.combine(x, y)
   }
 
+  def invalid[A]: Cut[A] = Cut[A](Some(Set.empty), Some(Set.empty))
+
   def reduce[A](cut: Cut[A]): Cut[A] = cut match {
-    case Cut(Some(intersect), Some(union)) if ((intersect intersect union).nonEmpty) => monoid.empty
+    case Cut(Some(intersect), Some(union)) if ((intersect intersect union).nonEmpty) => Cut.invalid
     case _ => cut
   }
 }

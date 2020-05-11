@@ -1,6 +1,5 @@
 package io.github.montokapro.set
 
-import io.finch._
 import org.scalatest.FunSpec
 import io.github.montokapro.set.Cut._
 
@@ -71,7 +70,7 @@ class CutSpec extends FunSpec {
           1
         ))
       )
-      assert(Cut.reduce(actual) == Cut.monoid.empty)
+      assert(Cut.reduce(actual) == Cut.invalid)
     }
   }
 }

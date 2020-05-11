@@ -9,10 +9,6 @@ object SetService {
   case class Not(not: Expr) extends Expr
   case class Id(id: Int) extends Expr
 
-  case class PropA(a: String) extends Expr
-  case class PropB(b: String) extends Expr
-
-
   // Grab the item in the set if it's the only item
   // Avoids checking the set size, which is theoretically costly to compute
   // This is probably slower in practice!
